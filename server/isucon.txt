@@ -1,0 +1,215 @@
+パッケージリストの更新
+$ sudo apt-get update
+インストールされてるパッケージの更新
+$ sudo apt-get upgrade
+locale の設定
+$ sudo apt-get install language-pack-ja
+locale に ja_JP.UTF-8 を設定
+$ sudo update-locale LANG=ja_JP.UTF-8
+timezone の設定
+$ sudo ln -sf /usr/share/zoneinfo/Asia/Tokyo /etc/localtime
+timezone に Asia/Tokyo を設定
+$ sudo dpkg-reconfigure --frontend noninteractive tzdata
+サービス自動起動の設定 (chkconfigみたいなやつ)
+$ sudo apt-get install sysv-rc-conf
+sysv-rc-conf で サービス自動起動の設定
+$ sudo sysv-rc-conf サービス名 on
+OS の再起動
+$ sudo reboot
+
+
+---------nginxのインストール----------
+PGPキーの追加
+$ curl http://nginx.org/keys/nginx_signing.key | sudo apt-key add -
+リポジトリを一覧に追加(OSのバージョンによって違うので注意する)http://qiita.com/hiroq/items/420424bc500d89fd1cc8
+
+$ sudo sh -c "echo 'deb http://nginx.org/packages/ubuntu/ trusty nginx' >> /etc/apt/sources.list"
+$ sudo sh -c "echo 'deb-src http://nginx.org/packages/ubuntu/ trusty nginx' >> /etc/apt/sources.list"
+
+アップデートの後、Nginxのインストール
+$ sudo apt-get update
+$ sudo apt-get install nginx
+
+---------PHP7.0のインストール-----------
+リポジトリの追加
+$ sudo apt-get install software-properties-common
+$ sudo add-apt-repository ppa:ondrej/php
+
+アップデートの後、インストール
+$ sudo apt-get update
+$ sudo apt-get install php (apacheはnginxがあるので起動でエラーがでる)
+$ sudo service apache2 stop
+$ sudo sysv-rc-conf apache2 off
+
+php7.0-fpmもインストール
+$ sudo apt-get install php7.0-fpm
+
+---------nginxとphp-fpmの自動起動設定-------
+$ sudo sysv-rc-conf nginx on
+$ sudo sysv-rc-conf php7.0-fpm on
+確認する
+$ sudo sysv-rc-conf --list
+
+---------Nginx設定ファイルの変更-----------
+$ sudo cp /etc/nginx/conf.d/default.conf /etc/nginx/conf.d/default.conf.bak
+$ sudo vi /etc/nginx/conf.d/default.conf
+
+http://qiita.com/Taku2/items/bbd7a48e6ac40f4eee8b参照
+
+php-fpmのソケットのパーミッションを変える
+sudo chmod 666 /var/run/php/php7.0-fpm.sock
+
+nginx再起動
+$ sudo service nginx restart
+
+Azureのセキュリティグループの受信にhttpを追加
+これでブラウザから見れる
+
+-------mysql5.7のインストール---------------
+debファイルのダウンロード
+$ wget http://dev.mysql.com/get/mysql-apt-config_0.5.3-1_all.deb
+
+パッケージのインストール
+$ sudo dpkg -i mysql-apt-config_0.5.3-1_all.deb
+guiっぽいインストーラーが動く
+Server を選択
+mysql-5.7 を選択
+Apply を選択
+
+パッケージをアップデート & インストール
+$ sudo apt-get update
+$ sudo apt-get install mysql-server
+
+#もし↑でエラーが出たら↓コマンドを実行する。
+$ sudo apt-get -f install
+
+guiでパスワードを入力
+
+ログインの確認
+$ mysql -u root -p
+
+自動起動設定
+$ sudo sysv-rc-conf mysql on
+
+--------appの設定------------------
+gitのインストール
+$ sudo apt-get install git
+appを取得
+
+$ sudo chmod 777 /var/www/
+$ cd /var/www/
+$ git clone https://inazou@bitbucket.org/yamato-isucon/isucon5.git
+
+$ sudo vi /etc/nginx/conf.d/default.conf
+root を/var/www/isucon5/webapp/phpに書き換え
+
+composerをインストール
+$ cd /var/www/isucon5/webapp/php/
+$ curl -sS https://getcomposer.org/installer | php
+$ php composer.phar install
+
+phpのエクステンションが足りないのでインストール
+$ sudo apt-get install php-mbstring
+
+slimのルーティングが効かないので追加
+$ sudo vi /etc/nginx/conf.d/default.conf
+ location / {
+             try_files $uri $uri/ /index.php?$args;
+ }
+
+再起動するとnginxがphp-fpmに接続できなくかるので
+$ sudo vi /etc/php/7.0/fpm/pool.d/www.conf
+user = nginx
+group = nginx
+listen.owner = nginx
+listen.group = nginx  
+
+$ sudo service php7.0-fpm restart
+
+cssなどが効かないので設定
+$ sudo vi /etc/nginx/conf.d/default.conf
+location ~ ^/(css|fonts|js) {
+          root /var/www/isucon5/webapp/static;
+}
+
+mysqlのデータベース作成
+$ mysql -u root -p
+$ create database isucon5q;
+$ use isucon5q;
+
+本番用のテーブル作成
+$ source /var/www/isucon5/webapp/sql/schema.sql
+
+データベースに接続できるようにする
+$ vi /var/www/isucon5/webapp/php/index.php
+
+$app = new \Slim\Slim(array(
+    'view' => new Isucon5View(),
+    'db' => array(
+    'host' => 'localhost',
+    'port' => 3306,
+    'username' => 'root',
+    'password' => 'jfc',
+    'database' => 'isucon5q'
+),
+'cookies.encrypt' => true,
+));
+
+$ sudo apt-get install php-mysql
+
+データを入れるスクリプトを実行する
+Ruby 2.3をインストール
+$ sudo apt-get install software-properties-common
+$ sudo apt-add-repository ppa:brightbox/ruby-ng
+$ sudo apt-get update
+$ sudo apt-get install ruby2.3
+$ sudo gem install bundler
+
+$ cd /var/www/isucon5/webapp/script
+$ sudo apt-get install libmysqld-dev 
+$ sudo apt-get install ruby2.3-dev
+$ sudo apt-get install make
+
+$ vi gen.rb
+
+@client = Mysql2::Client.new(
+      host: 'localhost',
+      port: 3306,
+      username: 'root',
+      password: 'jfc',
+      database: 'isucon5q',
+      encoding: 'utf8mb4', 
+      reconnect: true,
+)
+
+
+
+--------ベンチマーク---------
+java8のインストール
+$ sudo add-apt-repository ppa:webupd8team/java
+$ sudo apt-get update
+$ sudo apt-get install oracle-java8-installer
+
+javaのバージョン確認
+$ sudo dpkg --list | grep oracle-java
+$ java -version
+
+環境変数の設定
+#$ sudo apt-get install oracle-java8-set-default
+一度ログアウトして環境変数の確認
+#$ env | grep -i java
+
+gradleコマンドをインストール
+$ sudo add-apt-repository ppa:cwchien/gradle
+$ sudo apt-get update
+$ sudo apt-get install gradle-3.0
+
+ベンチマークのコンパイル
+$ cd /var/www/isucon5/bench/
+$ gradle compileJava
+
+ベンチマーク実行
+gradle -q run -Pargs="net.isucon.isucon5q.bench.scenario.Isucon5Qualification 13.78.88.155"
+
+
+
