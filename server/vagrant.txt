@@ -50,6 +50,8 @@ $ sudo apt-get install nginx
 $ sudo systemctl start nginx
 $ sudo systemctl enable nginx
 
+$ sudo cp -r ~/webapp /var/www/
+
 $ sudo vi /etc/nginx/nginx.conf
 
 user  www-data;
@@ -104,7 +106,7 @@ server {
      }
 
      location ~ ^/(css|fonts|js) {
-         root /var/www/isucon/webapp/static;
+         root /var/www/webapp/static;
      }
      #error_page  404              /404.html;
 
@@ -122,7 +124,7 @@ server {
      # pass the PHP scripts to FastCGI server listening on 127.0.0.1:9000
      #
      location ~ \.php$ {
-          root           /var/www/isucon/webapp/php;
+          root           /var/www/webapp/php;
           fastcgi_pass   unix:run/php5-fpm.sock;
           fastcgi_index  index.php;
           fastcgi_param  SCRIPT_FILENAME  $document_root/$fastcgi_script_name;
@@ -133,7 +135,7 @@ server {
 
 
 $ sudo apt-get install php5-fpm
-$ sudo systemctl start php5-fp
+$ sudo systemctl start php5-fpm
 $ sudo systemctl enable php5-fpm
 $ sudo apt-get install php5-mysql
 ベンチマーク確認
