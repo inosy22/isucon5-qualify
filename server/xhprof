@@ -1,0 +1,37 @@
+phpプロファイラー導入
+変なphpのパスを消す
+$ vi .bashrc 
+
+$ cd /var/www/
+$ sudo wget http://pecl.php.net/get/xhprof-0.9.4.tgz
+$ sudo tar xvfz xhprof-0.9.4.tgz
+$ cd xhprof-0.9.4/extension/
+$ sudo chmod 777 -R /var/www/xhprof-0.9.4
+$ sudo apt-get install php5-dev
+$ phpize
+$ ./configure --with-php-config=/usr/bin/php-config
+$ sudo make
+$ sudo make install
+
+$ sudo vi /etc/php5/fpm/php.ini
+;;;;;;;;;;;;;;;;;;;;;;
+; Dynamic Extensions ;
+;;;;;;;;;;;;;;;;;;;;;;
+extension=xhprof.so ←XHProfを使うようにする設定
+
+$ sudo mkdir /var/www/webapp/php/xhprof
+$ sudo cp -a /var/www/xhprof-0.9.4/xhprof_* /var/www/webapp/php/xhprof/
+
+
+評価したい処理を囲む
+xhprof_enable();
+処理
+$xhprof_data = xhprof_disable();
+//  プロファイリングページへのリンクを追加
+$XHPROF_ROOT = '/var/www/webapp/php/xhprof';  //xhprofをインストールしたディレクトリ
+$XHPROF_SOURCE_NAME = '';
+include_once $XHPROF_ROOT . "/xhprof_lib/utils/xhprof_lib.php";
+include_once $XHPROF_ROOT . "/xhprof_lib/utils/xhprof_runs.php";
+$xhprof_runs = new XHProfRuns_Default();
+$run_id = $xhprof_runs->save_run($xhprof_data, $XHPROF_SOURCE_NAME);
+echo "<a href=\"http://192.168.33.10/xhprof/xhprof_html/index.php?run=$run_id&source=$XHPROF_SOURCE_NAME\">xhprof Result</a>\n";
