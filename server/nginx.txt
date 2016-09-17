@@ -1,0 +1,80 @@
+nginxのチューニング
+
+ベンチマークツール wrk導入
+
+$ git clone https://github.com/wg/wrk.git
+$ cd wrk/
+$ make
+$ sudo cp wrk /usr/bin/wrk
+
+ベンチマーク実行
+$ wrk -c 100 -t 10 -d 10 http://192.168.33.10/login
+
+nginxの設定ファイル(conf.dのファイルごとまとめちゃう)
+$ sudo vi /etc/nginx/nginx.conf
+
+user  www-data;
+worker_processes  auto; # ワーカ数はnginxに委ねる
+worker_rlimit_nofile 100000; # orkerプロセスが最大に開けるファイル数の制限
+
+error_log  /var/log/nginx/error.log warn; # ベンチマークのときはコメントアウト
+pid        /var/run/nginx.pid;
+
+events {
+    worker_connections  10240;
+    accept_mutex_delay 100ms; # accept()時のmutexの確保に失敗した際の待機時間を調整する
+    multi_accept on; # クライアントからのリクエストを多く受け取る
+    use epoll; # epollはデフォルトのselectより効率がよい処理ができる
+}
+
+
+http {
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
+
+    #server_tokens off; # nginxのバージョンを隠す
+
+    # ベンチマークのときはコメントアウト
+    log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                      '$status $body_bytes_sent "$http_referer" '
+                      '"$http_user_agent" "$http_x_forwarded_for"';
+
+    access_log  /var/log/nginx/access.log  main; # ベンチマークのときはコメントアウト
+
+    sendfile        on;
+    #tcp_nopush     on; # レスポンスヘッダとファイルの内容をまとめて送る これ使うとスコアが下がる
+    tcp_nodelay on; # データをキャッシュしないで、どんどん送信させる
+    client_header_timeout 10; # クライアントタイムアウト時間、少し短くしとく
+    client_body_timeout 10; # クライアントタイムアウト時間、少し短くしとく
+    reset_timedout_connection on; # 非アクティブクライアントのコネクションをクローズする
+    send_timeout 10; # クライアントへの送信タイムアウト 10秒以上なら潔く諦める
+
+    limit_conn_zone $binary_remote_addr zone=addr:5m; # 各種keyの共有メモリ設定
+    limit_conn addr 100; # keyの最大コネクション数 一つのIPアドレスは100コネクションんをリクエストできる
+
+    keepalive_timeout  3;
+
+    gzip  on;
+    gzip_types text/plain application/x-javascript text/xml application/xml application/xml+rss text/javascript application/javascript application/json;
+
+    open_file_cache max=100 inactive=20s; # 一度開いたファイルをキャッシュ max: キャッシュの最大数 inactive: アクセスがないキャッシュの有効期限
+
+    server {
+     listen       80;
+
+     location / {
+           root   /var/www/webapp/php;
+           index  index.php;
+           try_files $uri $uri/ /index.php?$args;
+     }
+     location ~ ^/(css|fonts|js) {
+           root /var/www/webapp/static;
+     }
+     location ~ \.php$ {
+           root           /var/www/webapp/php;
+           fastcgi_pass   unix:run/php5-fpm.sock;
+           fastcgi_index  index.php;
+           fastcgi_param  SCRIPT_FILENAME  $document_root/$fastcgi_script_name;
+           include        fastcgi_params;
+     }
+    }
